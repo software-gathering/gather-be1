@@ -2,7 +2,11 @@ package com.gathering.gathering_backend.service;
 
 import com.gathering.gathering_backend.dto.UserRegisterDTO;
 import com.gathering.gathering_backend.dto.UserUpdateDTO;
+import com.gathering.gathering_backend.entity.Interest;
 import com.gathering.gathering_backend.entity.User;
+import com.gathering.gathering_backend.entity.UserInterest;
+import com.gathering.gathering_backend.repository.InterestRepository;
+import com.gathering.gathering_backend.repository.UserInterestRepository;
 import com.gathering.gathering_backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -14,6 +18,8 @@ public class UserServiceImpl implements UserService{
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final UserInterestRepository userInterestRepository;
+    private final InterestRepository interestRepository;
 
     @Override
     public void registerUser(UserRegisterDTO userRegisterDTO) {
@@ -40,26 +46,40 @@ public class UserServiceImpl implements UserService{
 
     @Override
     public User updateUser(Long userNo, UserUpdateDTO userUpdateDTO) {
-        // 유저 조회
+        // 사용자 정보 가져오기
         User user = userRepository.findById(userNo)
-                .orElseThrow(() -> new IllegalArgumentException("해당 사용자를 찾을 수 없습니다."));
+                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
 
-        // 비밀번호가 제공되면 업데이트
-        if (userUpdateDTO.getUserPw() != null && !userUpdateDTO.getUserPw().isBlank()) {
+        // 비밀번호 변경
+        if (userUpdateDTO.getUserPw() != null) {
             user.setUserPw(passwordEncoder.encode(userUpdateDTO.getUserPw()));
         }
 
-        // 닉네임이 제공되면 업데이트
-        if (userUpdateDTO.getUserName() != null && !userUpdateDTO.getUserName().isBlank()) {
+        // 이름 변경
+        if (userUpdateDTO.getUserName() != null) {
             user.setUserName(userUpdateDTO.getUserName());
         }
 
-        // 자기소개가 제공되면 업데이트
+        // 설명 변경
         if (userUpdateDTO.getUserDescription() != null) {
             user.setUserDescription(userUpdateDTO.getUserDescription());
         }
 
-        // 변경된 내용 저장
+        // 관심사 업데이트
+        if (userUpdateDTO.getInterests() != null && !userUpdateDTO.getInterests().isEmpty()) {
+            userInterestRepository.deleteByUserUserNo(userNo); // 기존 관심사 삭제
+
+            for (Long interestId : userUpdateDTO.getInterests()) {
+                Interest interest = interestRepository.findById(interestId)
+                        .orElseThrow(() -> new IllegalArgumentException("Invalid interest ID: " + interestId));
+
+                UserInterest userInterest = new UserInterest();
+                userInterest.setUser(user);
+                userInterest.setInterest(interest);
+                userInterestRepository.save(userInterest);
+            }
+        }
+
         return userRepository.save(user);
     }
 
